@@ -11,7 +11,7 @@ entity self_purging_fir is
     Port (clk: in std_logic;
           rst: in std_logic;
           we: in std_logic;
-          coef_addr: std_logic_vector(log2c(fir_ord + 1) - 1 downto 0);
+          coef_addr: in std_logic_vector(log2c(fir_ord + 1) - 1 downto 0);
           coef: in std_logic_vector(input_data_width - 1 downto 0);
           data_i: in std_logic_vector(input_data_width - 1 downto 0);
           data_o: out std_logic_vector(output_data_width - 1 downto 0));
