@@ -34,6 +34,9 @@ architecture Behavioral of fir_axi_top is
     signal last_flag_reg, last_flag_next: std_logic;
     signal last_count_reg, last_count_next: std_logic_vector(log2c(2*fir_ord) - 1 downto 0);
     
+    signal ain_not_valid_flag_reg, ain_not_valid_flag_next: std_logic;
+    signal ain_not_valid_count_reg, ain_not_valid_count_next: std_logic_vector(log2c(fir_ord) - 1 downto 0);
+    
     signal data_i: std_logic_vector(input_data_width - 1 downto 0);
     signal data_o: std_logic_vector(output_data_width - 1 downto 0);
 begin
@@ -64,17 +67,21 @@ begin
                 aout_state_reg <= aout_idle;
                 last_count_reg <= (others => '0');
                 last_flag_reg <= '0';
+                ain_not_valid_count_reg <= (others => '0');
+                ain_not_valid_flag_reg <= '0';
             else 
                 ain_state_reg <= ain_state_next;
                 aout_state_reg <= aout_state_next;
                 last_count_reg <= last_count_next;
                 last_flag_reg <= last_flag_next;
+                ain_not_valid_count_reg <= ain_not_valid_count_next;
+                ain_not_valid_flag_reg <= ain_not_valid_flag_next;
             end if;
         end if;
     end process;
     
     ain_protocol:
-    process (ain_state_reg, ain_tvalid, aout_tready, ain_tdata, ain_tlast) is
+    process (ain_state_reg, ain_tvalid, aout_tready, ain_tdata, ain_tlast, aout_state_reg) is
     begin
         ain_state_next <= ain_state_reg;
         ain_tready <= '0';
@@ -82,28 +89,31 @@ begin
         
         case ain_state_reg is
             when ain_idle =>
-                if (ain_tvalid = '1' and aout_tready = '1') then
+                if (ain_tvalid = '1' and aout_tready = '1' and aout_state_reg = AOUT_IDLE) then
                     ain_state_next <= ain_read;
                 end if;
             when ain_read =>
-                ain_tready <= '1';
-                
-                if (ain_tvalid = '1') then
+                if (ain_tvalid = '1' and aout_tready = '1') then
+                    ain_tready <= '1';
                     data_i <= ain_tdata;
                     if (ain_tlast = '1') then
                         ain_state_next <= ain_idle;
                     end if;
+                else
+                    ain_state_next <= ain_idle;
                 end if;
             when others =>
         end case;
     end process;
     
     aout_protocol:
-    process (aout_state_reg, last_count_reg, last_flag_reg, ain_tvalid, ain_tlast, aout_tready, data_o) is
+    process (aout_state_reg, last_count_reg, last_flag_reg, ain_tvalid, ain_tlast, aout_tready, data_o, ain_not_valid_flag_reg, ain_not_valid_count_reg) is
     begin
         aout_state_next <= aout_state_reg;
         last_count_next <= last_count_reg;
         last_flag_next <= last_flag_reg;
+        ain_not_valid_count_next <= ain_not_valid_count_reg;
+        ain_not_valid_flag_next <= ain_not_valid_flag_reg;
         aout_tvalid <= '0';
         aout_tlast <= '0';
         aout_tdata <= (others => '0');
@@ -114,23 +124,41 @@ begin
                     aout_state_next <= aout_write;
                 end if;
             when aout_write =>
-                aout_tdata <= data_o;
-                aout_tvalid <= '1';
-                
-                if (ain_tlast = '1') then
-                    last_count_next <= std_logic_vector(to_unsigned(1, log2c(2*fir_ord)));
-                    last_flag_next <= '1';
-                end if;
-                
-                if (last_flag_reg = '1') then
-                    last_count_next <= std_logic_vector(unsigned(last_count_reg) + 1);
-                end if;
-                
-                if (last_count_reg = std_logic_vector(to_unsigned(2*fir_ord - 1, log2c(2*fir_ord)))) then
+                if (aout_tready = '1') then
+                    aout_tdata <= data_o;
+                    aout_tvalid <= '1';
+                    
+                    if (ain_tvalid = '0') then
+                        ain_not_valid_flag_next <= '1';
+                    end if;
+                    
+                    if (ain_not_valid_flag_reg = '1') then
+                        ain_not_valid_count_next <= std_logic_vector(unsigned(ain_not_valid_count_reg) + 1);
+                    end if;
+                    
+                    if (ain_tlast = '1') then
+                        last_count_next <= std_logic_vector(to_unsigned(1, log2c(2*fir_ord)));
+                        last_flag_next <= '1';
+                    end if;
+                    
+                    if (last_flag_reg = '1') then
+                        last_count_next <= std_logic_vector(unsigned(last_count_reg) + 1);
+                    end if;
+                    
+                    if (last_count_reg = std_logic_vector(to_unsigned(2*fir_ord - 1, log2c(2*fir_ord))) or 
+                        ain_not_valid_count_reg = std_logic_vector(to_unsigned(fir_ord - 2, log2c(fir_ord)))) then
+                        aout_state_next <= aout_idle;
+                        aout_tlast <= '1';
+                        last_count_next <= (others => '0');
+                        last_flag_next <= '0';
+                        ain_not_valid_count_next <= (others => '0');
+                        ain_not_valid_flag_next <= '0';
+                    end if;
+                else
                     aout_state_next <= aout_idle;
-                    aout_tlast <= '1';
                     last_count_next <= (others => '0');
                     last_flag_next <= '0';
+                    ain_not_valid_count_next <= (others => '0');
                 end if;
             when others =>
         end case;
