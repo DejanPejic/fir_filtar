@@ -90,7 +90,7 @@ begin
         
         case ain_state_reg is
             when ain_idle =>
-                if (ain_tvalid = '1' and aout_tready = '1' and aout_state_reg = AOUT_IDLE) then
+                if (ain_tvalid = '1' and aout_tready = '1' and aout_state_reg = aout_idle) then
                     ain_state_next <= ain_read;
                     ain_done_next <= '0';
                 end if;
