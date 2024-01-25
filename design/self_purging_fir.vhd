@@ -9,6 +9,7 @@ entity self_purging_fir is
              input_data_width: integer := 18;
              output_data_width: integer := 18);
     Port (clk: in std_logic;
+          ce: in std_logic;
           rst: in std_logic;
           we: in std_logic;
           coef_addr: in std_logic_vector(log2c(fir_ord + 1) - 1 downto 0);
@@ -56,7 +57,7 @@ begin
         if (rising_edge(clk)) then
             if (rst = '1') then
                 u_delay_reg <= (others => (others => '0'));
-            else
+            elsif (ce = '1') then
                 for i in 1 to fir_ord loop
                     u_delay_reg(i) <= u_delay_next(i);
                 end loop;
@@ -81,6 +82,7 @@ begin
         )
         port map (
             clk => clk,
+            ce => ce,
             rst => rst,
             u => data_i,
             b => b_s(fir_ord),
@@ -101,6 +103,7 @@ begin
             )
             port map (
                 clk => clk,
+                ce => ce,
                 rst => rst,
                 u => u_delay_reg(j),
                 b => b_s(fir_ord - j),

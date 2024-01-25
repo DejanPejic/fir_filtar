@@ -6,6 +6,7 @@ entity mac is
     Generic (input_data_width: integer := 18;
              output_data_width: integer := 18);
     Port (clk: in std_logic;
+          ce: in std_logic;
           rst: in std_logic;
           u: in std_logic_vector(input_data_width - 1 downto 0);
           b: in std_logic_vector(input_data_width - 1 downto 0);
@@ -31,7 +32,7 @@ begin
                 b_reg <= (others => '0');
                 sec_reg <= (others => '0');
                 res_reg <= (others => '0');
-            else
+            elsif (ce = '1') then
                 u_reg <= u_next;
                 b_reg <= b_next;
                 sec_reg <= sec_next;
